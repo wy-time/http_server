@@ -8,5 +8,9 @@
 #include <sys/stat.h> 
 #include <cstring> 
 #include <algorithm> 
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <arpa/inet.h> 
+#include <iostream> 
 
 #endif //__HTTP_SERVER_H__
