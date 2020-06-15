@@ -1,5 +1,5 @@
 #include "rio.h" 
-ssize_t Rio::rio_readn (int fd,void * usrbuf,size_t n)
+ssize_t RIO:: Rio::rio_readn (int fd,void * usrbuf,size_t n)
 {
     size_t isleft=n;
     size_t isread;
@@ -19,7 +19,7 @@ ssize_t Rio::rio_readn (int fd,void * usrbuf,size_t n)
     }
     return (n-isleft);
 }
-ssize_t Rio::rio_writen (int fd,void *usrbuf ,size_t n)
+ssize_t RIO::Rio::rio_writen (int fd,void *usrbuf ,size_t n)
 {
     size_t isleft=n;
     size_t iswrite;
@@ -38,13 +38,13 @@ ssize_t Rio::rio_writen (int fd,void *usrbuf ,size_t n)
     }
     return n;
 }
-void Rio::rio_readinitb (rio_t *rp,int fd)
+void RIO::Rio::rio_readinitb (rio_t *rp,int fd)
 {
     rp->rio_fd=fd;
     rp->rio_cnt=0;
     rp->rio_bufptr=rp->rio_buf;
 }
-ssize_t Rio::rio_read (rio_t *rp,char *usrbuf,size_t n)
+ssize_t RIO::Rio::rio_read (rio_t *rp,char *usrbuf,size_t n)
 {
     int cnt;
     while (rp->rio_cnt<=0)
@@ -65,7 +65,7 @@ ssize_t Rio::rio_read (rio_t *rp,char *usrbuf,size_t n)
     rp->rio_bufptr+=cnt;
     return cnt;
 }
-ssize_t Rio::rio_readlineb (rio_t* rp,void *usrbuf,size_t maxlen)
+ssize_t RIO::Rio::rio_readlineb (rio_t* rp,void *usrbuf,size_t maxlen)
 {
     int isread;
     int i;
@@ -89,7 +89,7 @@ ssize_t Rio::rio_readlineb (rio_t* rp,void *usrbuf,size_t maxlen)
     *buf='\0';
     return i+1;
 }
-ssize_t Rio::rio_readnb (rio_t* rp,void *usrbuf,size_t n)
+ssize_t RIO::Rio::rio_readnb (rio_t* rp,void *usrbuf,size_t n)
 {
     int isleft=n;
     int isread;

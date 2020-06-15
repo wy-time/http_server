@@ -1,6 +1,6 @@
 #include "my_socket.h" 
 #define LISTENQ 1024
-int MySocket::openClientfd(char* hostname,int port)
+int M_SOCKET::MySocket::openClientfd(char* hostname,int port)
 {
     int clientfd;
     sockaddr_in serveraddr;//套接字地址
@@ -20,7 +20,7 @@ int MySocket::openClientfd(char* hostname,int port)
     return clientfd;
 }
 
-int MySocket::openListenfd(int port)
+int M_SOCKET::MySocket::openListenfd(int port)
 {
     int listenfd,optval=1;
     sockaddr_in serveraddr;

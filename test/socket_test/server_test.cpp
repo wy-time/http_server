@@ -4,12 +4,12 @@
 #define MAXLEN 200
 int main ()
 {
-    int listenfd=MySocket::openListenfd (8888);//监听描述符
+    int listenfd=M_SOCKET::MySocket::openListenfd (8888);//监听描述符
     sockaddr_in clientaddr;//客户端套接字地址
     unsigned int clientlen;//客户端地址长度
     hostent *client; //客户端信息
     memset(&clientaddr,0,sizeof(clientaddr));
-    rio_t riobuffer(0);
+    RIO::rio_t riobuffer(0);
     while(true)
     {
         clientlen=sizeof(clientaddr);
@@ -18,7 +18,7 @@ int main ()
         char *claddr=inet_ntoa(clientaddr.sin_addr);
         std::cout<<"server connect to "<<client->h_name<<"("<<claddr<<")"<<std::endl;
         //printf("server connect to %s (%s)\n",client->h_name,claddr);
-        Rio rio;
+        RIO::Rio rio;
         rio.rio_readinitb(&riobuffer,connectfd);
         char buf[MAXLEN];
         int n;

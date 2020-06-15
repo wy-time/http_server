@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-SET(CMAKE_C_COMPILER g++)
+# SET(CMAKE_C_COMPILER g++)
 SET(CMAKE_CXX_COMPILTER g++)
 add_compile_options(-std=c++11 -g)
 project(httpserver)

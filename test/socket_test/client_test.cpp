@@ -5,10 +5,10 @@
 int main ()
 {
     char hostname[10]="localhost";
-    int clientfd=MySocket::openClientfd(hostname,8888);
-    rio_t riobuffer(clientfd);
+    int clientfd=M_SOCKET::MySocket::openClientfd(hostname,8888);
+    RIO::rio_t riobuffer(clientfd);
     char buf[MAXLEN];
-    Rio rio;
+    RIO::Rio rio;
     while(fgets(buf,MAXLEN,stdin)!=NULL)
     {
         int len=strlen(buf);

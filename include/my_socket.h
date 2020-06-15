@@ -14,15 +14,19 @@
 //    in_addr sin_addr;//ip地址
 //    unsigned char sin_zero [8];//填充结构体，使得大小和标准格式sockaddr一致
 //};   
-class MySocket 
+namespace M_SOCKET
 {
-    public:
-        //客户端和服务器简历连接，返回一个描述符，出错返回-1
-        static int openClientfd (char *hostname,int port);
-        //服务器创建一个监听描述符
-        static int openListenfd (int port);
-    private:
-        MySocket ()=default;
-};
+    class MySocket 
+    {
+        public:
+            //客户端和服务器简历连接，返回一个描述符，出错返回-1
+            static int openClientfd (char *hostname,int port);
+            //服务器创建一个监听描述符
+            static int openListenfd (int port);
+        private:
+            MySocket ()=default;
+    };  
+}
+
 #endif//__MY_SOCKET_H__
 
