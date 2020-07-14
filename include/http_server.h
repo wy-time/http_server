@@ -12,5 +12,6 @@
 #include <netinet/in.h> 
 #include <arpa/inet.h> 
 #include <iostream> 
+#include <unistd.h> 
 
 #endif //__HTTP_SERVER_H__

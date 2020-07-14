@@ -11,6 +11,7 @@ namespace RIO
         char * rio_bufptr;//缓冲区头指针
         char rio_buf [RIO_BUFSIZE];//缓冲区
         rio_t (int fd):rio_fd (fd),rio_cnt (0),rio_bufptr(rio_buf){}
+        rio_t()=default;
     };
     class Rio 
     {
