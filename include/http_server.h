@@ -13,5 +13,10 @@
 #include <arpa/inet.h> 
 #include <iostream> 
 #include <unistd.h> 
-
+#include <mutex> 
+#include <condition_variable> 
+#include <thread> 
+#include <atomic> 
+#include <queue> 
+#include <memory> 
 #endif //__HTTP_SERVER_H__
