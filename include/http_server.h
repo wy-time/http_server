@@ -19,4 +19,8 @@
 #include <atomic> 
 #include <queue> 
 #include <memory> 
+#include <cassert> 
+#include <sys/epoll.h> 
+#include <unordered_map> 
+#include <sys/signal.h> 
 #endif //__HTTP_SERVER_H__

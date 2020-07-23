@@ -29,10 +29,7 @@ void thp::Thread_Pool<T>::work()
                 cv.wait(lk,[this]()->bool{return !is_runing||!task_queue.empty();});
         }
         if(task!=nullptr)
-        {
             task->run();//调用任务类的run函数
-            delete task;//执行完，释放空间
-        }
     }
     return ;
 }

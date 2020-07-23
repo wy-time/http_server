@@ -1,53 +1,106 @@
 #include "http_conn.h" 
-
-void http_conn::HttpConn::init()
+int http_conn::HttpConn::epollfd=-1;
+void http_conn::setnoblock(int fd)//设置文件描述符非阻塞
 {
-    requestreadstatus=REQUEST_LINE;
-    requeststatuscode=NO_REQUEST;
-
-    listenfd=M_SOCKET::MySocket::openListenfd(8888);//在8888端口打开一个监听描述符
-    struct sockaddr_in clientaddr;
-    unsigned int clientlen=sizeof(clientaddr);
-    connfd=accept (listenfd, (sockaddr*) &clientaddr,&clientlen);
-    rio.rio_readinitb(&riobuffer,connfd);
-    requeststatuscode=parse_request();
-    if(requeststatuscode!=SUCCESS)
-    {
-        parse_error();
-    }
-    close(connfd);
+    int flag=fcntl(fd,F_GETFL);
+    assert(flag>0);
+    fcntl(fd,F_SETFL,flag|O_NONBLOCK);
 }
 
-http_conn::READ_LINE_STATUS http_conn::HttpConn::readLine()//读取一行请求
+void http_conn::addfd(int epollfd,int fd,bool et,bool oneshot)//将文件描述符添加进epoll进行监听
 {
+    epoll_event event;
+    event.data.fd=fd;
+    event.events=EPOLLIN |EPOLLRDHUP;//注册两个事件
+    if(et)
+        event.events|=EPOLLET;//边沿触发模式
+    if(oneshot)
+        event.events|=EPOLLONESHOT;//只响应一次
+    epoll_ctl(epollfd,EPOLL_CTL_ADD,fd,&event);//注册事件
+}
+
+void http_conn::modfd(int epollfd,int fd,int ev)//重置事件，可以接受新的事件
+{
+    epoll_event event;
+    event.data.fd=fd;
+    event.events=ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
+    epoll_ctl(epollfd,EPOLL_CTL_MOD,fd,&event);//注册事件
+}
+
+void http_conn::removefd(int epollfd,int fd)//将描述符移除出epool,并关闭文件描述符
+{
+    epoll_ctl(epollfd,EPOLL_CTL_DEL,fd,0);
+    close(fd);
+}
+void http_conn::HttpConn::init(int fd)
+{
+    requestreadstatus=REQUEST_LINE;//初始化读取状态为读取请求行
+    requeststatuscode=NO_REQUEST;//初始化http请求的状态
+    connfd=fd;//给已连接描述符赋值
+    rio.rio_readinitb(&riobuffer,connfd);//将已连接描述符和读缓冲区绑定
+    r_check_idx=0;
+    w_send_idx=0;
     text.clear();
+    readbuffer.clear();
+    writebuffer.clear();
+    setnoblock(connfd);
+    addfd(epollfd,connfd,true,true);//将该连接加入监听
+}
+
+bool http_conn::HttpConn::readall()//读取所有数据放入读缓冲区
+{
+    int isread;
+    char c;
+    //循环读取数据直到无数据可读或客户端关闭连接
+    while(true)
+    {
+        isread=rio.rio_readnb(&riobuffer,&c,1);
+        if(isread>0)
+            readbuffer.append(1,c);
+        else if(isread==-1)
+        {
+            if(errno == EAGAIN || errno == EWOULDBLOCK)
+                break;
+            return false;
+        }else if(isread==0)
+            return false;
+    }
+    return true;
+}
+http_conn::READ_LINE_STATUS http_conn::HttpConn::readLine()//读取一行请求(从读取缓冲区)
+{
+    if(readlinestatus!=LINE_OPEN)//没读取到完整行的时候不清空
+        text.clear();
     char c;
     http_conn::READ_LINE_STATUS statu=LINE_OPEN;
-    while(statu==LINE_OPEN)
+    int len=readbuffer.length();
+    for(;r_check_idx<len;r_check_idx++)
     {
-        int isread=rio.rio_readnb(&riobuffer,&c,1);
-        switch (isread)
+        c=readbuffer[r_check_idx];
+        if (c=='\n')
         {
-            case -1:
-                statu=LINE_BAD;
-                break;
-            case 1:
-                statu=LINE_OPEN;
-                if (c=='\n')
-                {
-                    if (*text.rbegin()=='\r')
-                        statu=LINE_OK;
-                    else
-                        statu=LINE_BAD;//出现单独的'\n'
-                }else
-                {
-                    if(*text.rend()=='\r')
-                        statu=LINE_BAD;//出现单独的'\r'
-                }
+            if (r_check_idx-1>=0&&readbuffer[r_check_idx-1]=='\r')//\n前面是\r
+            {
+                statu=LINE_OK;
                 text.append(1,c);
                 break;
+            }
+            else//\n前面不是\r，则出错
+            {
+                statu=LINE_BAD;//出现单独的'\n'
+                break;
+            }
+        }else if(c!='\r')
+        {
+            if(r_check_idx-1>=0&&readbuffer[r_check_idx-1]=='\r')//\r后面不是\n则出错
+            {
+                statu=LINE_BAD;
+                break;
+            }
         }
+        text.append(1,c);
     }
+    r_check_idx++;
     return statu;
 }
 http_conn::HTTP_CODE http_conn::HttpConn::parse_requestline()//处理请求行
@@ -57,7 +110,7 @@ http_conn::HTTP_CODE http_conn::HttpConn::parse_requestline()//处理请求行
     std::stringstream ss(text);
     ss>>method>>uri>>version;
     transform(method.begin(), method.end(), method.begin(), ::toupper);
-    if (method.compare("GET")!=0&&method.compare("POST")!=0)
+    if (method.compare("GET")!=0/*&&method.compare("POST")!=0*/)
     {
         return NOT_IMPLEMENTED;
     }
@@ -130,7 +183,9 @@ http_conn::HTTP_CODE http_conn::HttpConn::parse_request()//处理http请求
 
         }
     }
-    return BAD_REQUEST;
+    if(readlinestatus==LINE_BAD)
+        return BAD_REQUEST;
+    return NO_REQUEST;
 }
 
 int http_conn::HttpConn::parse_uri()//解析请求的资源
@@ -138,7 +193,7 @@ int http_conn::HttpConn::parse_uri()//解析请求的资源
     if(uri.find("cgi-bin")==std::string::npos)//静态资源
     {
         cgiargs="";//没有参数
-        filename="./static";//默认网站根目录味当前目录
+        filename="/home/time/work/http_server/bin/static";//默认网站根目录味当前目录
         filename+=uri;//加上请求的目录
         if(*uri.rbegin()=='/')
             filename+="index.html";//加上默认访问页面
@@ -160,7 +215,7 @@ int http_conn::HttpConn::parse_uri()//解析请求的资源
 http_conn::HTTP_CODE http_conn::HttpConn::parse_static_request()//处理静态请求
 {
     struct stat sbuf;
-    std::string filetype,buf;
+    std::string filetype;
     if(stat(filename.c_str(),&sbuf)<0)//获取文件的信息
     {
         return NOT_FOUND;
@@ -182,13 +237,10 @@ http_conn::HTTP_CODE http_conn::HttpConn::parse_static_request()//处理静态�
     ss<<"Server: Time Web Server\r\n";
     ss<<"Content-length: "<<sbuf.st_size<<"\r\n";
     ss<<"Content-type: "<<filetype<<"\r\n\r\n";
-    buf=ss.str();
-    rio.rio_writen(connfd,(char*)buf.c_str(),sbuf.st_size);
     int filefd=open(filename.c_str(),O_RDONLY,0);
     char *usrbuf=(char*)malloc(sbuf.st_size+2);
-    RIO::rio_t readbuf(filefd);
     rio.rio_readn(filefd,usrbuf,sbuf.st_size);
-    rio.rio_writen(connfd,usrbuf,sbuf.st_size);
+    writebuffer=ss.str()+usrbuf;//将响应行和响应头,还有响应体写入写缓冲区
     free(usrbuf);
     close(filefd);
     return SUCCESS;
@@ -240,6 +292,44 @@ void http_conn::HttpConn::parse_error()//处理错误信息
     ss<<"Content-type: "<<"text/html\r\n";
     ss<<"Content-length: "<<body.size()<<"\r\n\r\n";
     ss<<body;
-    body=ss.str();
-    rio.rio_writen(connfd,(char *)body.c_str(),body.size());
+    writebuffer=ss.str();//将响应放入写缓冲区
 }
+
+bool http_conn::HttpConn::write_back()//将响应写入文件
+{
+    //因为是非阻塞且为ET触发，所以需要一次把数据发完
+    int need_to_send=writebuffer.length();
+    while(w_send_idx<need_to_send-1)
+    {
+        int issend=rio.rio_writen(connfd,((char *) writebuffer.c_str())+w_send_idx,need_to_send-w_send_idx);
+        if(issend<0)
+        {
+            if(errno==EAGAIN)//暂时不可写
+            {
+                modfd(epollfd,connfd,EPOLLOUT);//等待下一次输出
+                return true;
+            }else
+                return false;
+        }
+        w_send_idx=issend-1;
+    }
+    return false;
+}
+void http_conn::HttpConn::run()
+{
+    requeststatuscode=parse_request();//解析http请求
+    if(requeststatuscode==NO_REQUEST)
+    {
+        modfd(epollfd,connfd,EPOLLIN);//重置事件等待下一次读取
+        return ;
+    }else if(requeststatuscode!=SUCCESS)
+    {
+        parse_error();
+    }
+    modfd(epollfd,connfd,EPOLLOUT);//重置事件等待下一次输出
+}
+http_conn::HttpConn::~HttpConn()//析构函数，关闭已连接描述符
+{
+    removefd(epollfd,connfd);
+}
+
